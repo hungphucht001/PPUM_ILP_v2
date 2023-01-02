@@ -1,3 +1,6 @@
+import time
+
+
 def load_dataset_util(filename):
     with open(filename) as f:
         lines = f.readlines()
@@ -36,4 +39,4 @@ def load_dataset_util(filename):
     return data, sum_util, data_util, sorted(item_list)
 
 
-data, sum_util, data_util, item_list = load_dataset_util('chess_quan.txt')
+# data, sum_util, data_util, item_list = load_dataset_util('abc.txt')

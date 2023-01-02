@@ -471,9 +471,9 @@ def Run():
     print(item_list)
         
     # Tính minutility
-    minutility = sum(tran_util)*delta 
+    minutility = sum(tran_util)*delta
     print('min utility: ', minutility)
-    
+
     print('====================')
     print('TWU từng item (>= minutil)')
     v_name = []
@@ -490,7 +490,7 @@ def Run():
     velocities = Random_V(numberpartical, v_value)
     pBest = copy.deepcopy(particles)
     gBest = Best(pBest, data, data_util, v_name)
-    
+
     print('============================')
     # .....
     get_Hui = []
@@ -511,7 +511,7 @@ def Run():
         print('Lan lap: ', t)
         velocities = Update_velocities(velocities, pBest, particles, gBest, w, c1, c2)
         particles = Update_partical(velocities)
-        
+
         # Kiểm tra HUI trước rồi mới cập nhật pbest gbest
         for particle in particles:
             itemset = ConverToItemset(particle, v_name)
@@ -523,16 +523,17 @@ def Run():
                     continue
                 else:
                     get_Hui.append(itemset)
-        
+
         # cập nhật bảng pBest
         pBest = Update_pBest(particles, pBest, data, data_util, v_name)
         # Cập nhật gBest
         gBest_candidate = Best(pBest, data, data_util, v_name)
         if (Cal_uItemset(ConverToItemset(gBest_candidate, v_name), data, data_util) > Cal_uItemset(ConverToItemset(gBest, v_name), data, data_util)) :
-            gBest = gBest_candidate         
+            gBest = gBest_candidate
     return get_Hui
 
 if __name__ == "__main__":
     start = time.time()
+    # Run()
     write_dataset('HUIm.csv', Run())
     print('Tổng thời gian: %s giây' % (time.time() - start))

@@ -1,3 +1,4 @@
+import time
 
 
 def compare_array(array_one, array_two):
@@ -45,62 +46,98 @@ def get_lables(utility_list):
 
 
 class HUIMiner:
-    def __init__(self, data_chess, data_util, min_util):
+    def __init__(self, data_chess, data_util, min_util, twu_name):
         self.data_chess = data_chess
         self.data_util = data_util
         self.min_util = min_util
-        self.get_list_item_set_result = self.get_list_item_set
-        self.utility_list_result = self.utility_list(self.get_list_item_set_result)
+        self.twu_name = twu_name
+        self.utility_list_result = self.utility_list
     @property
-    def get_list_item_set(self):
+    def utility_list(self):
         """
             list item set single
         """
-        data_chess, data_util = self.reverse_data_chess_and_data_util(self.data_chess, self.data_util)
-        tid = 1
-        arr = []
-        for row in data_chess:
+        # data_chess, data_util = self.reverse_data_chess_and_data_util(self.data_chess, self.data_util)
+        # print(data_chess, data_util)
+        # arr = []
+        lables = []
+        utility_list = []
+
+        for tid, row in enumerate(self.data_chess, start=1):
             Ru = 0
             n = 0
             for item in row:
-                u = data_util[tid - 1][n]
-                arr.append({"tid": tid, "item": [item], "Ru": Ru, "u": u})
+                u = self.data_util[tid - 1][n]
+                temp = {"tid": tid, "item": [item], "Ru": Ru, "u": u}
+                # arr.append(temp)
                 Ru = Ru + u
                 n = n + 1
-            tid = tid + 1
-        return arr
 
-    @staticmethod
-    def reverse_data_chess_and_data_util(data_chess, data_util):
-        """
-            reverse data chess
-            reverse data util
-        """
-        new_data_chess = []
-        for row in data_chess:
-            numpy_list = row[::-1]
-            new_data_chess.append(numpy_list)
+                if item not in lables:
+                    lables.append(item)
+                    utility_list.append([[item], []])
 
-        new_data_util = []
-        for row in data_util:
-            numpy_list = row[::-1]
-            new_data_util.append(numpy_list)
+                for item in utility_list:
+                    if temp["item"] == item[0]:
+                        item[1].append(temp)
+        return utility_list
+    #
+    # @property
+    # def get_list_item_set(self):
+    #     """
+    #         list item set single
+    #     """
+    #     # data_chess, data_util = self.reverse_data_chess_and_data_util(self.data_chess, self.data_util)
+    #     # print(data_chess, data_util)
+    #     tid = 1
+    #     arr = []
+    #     lables = []
+    #
+    #     for row in self.data_chess:
+    #         Ru = 0
+    #         n = 0
+    #         print("row", row)
+    #         for item in row:
+    #             u = self.data_util[tid - 1][n]
+    #             arr.append({"tid": tid, "item": [item], "Ru": Ru, "u": u})
+    #             Ru = Ru + u
+    #             n = n + 1
+    #         tid = tid + 1
+    #     return arr
+    # @staticmethod
+    # def reverse_data_chess_and_data_util(data_chess, data_util):
+    #     """
+    #         reverse data chess
+    #         reverse data util
+    #     """
+    #     new_data_chess = []
+    #     for row in data_chess:
+    #         numpy_list = row[::-1]
+    #         new_data_chess.append(numpy_list)
+    #
+    #     new_data_util = []
+    #     for row in data_util:
+    #         numpy_list = row[::-1]
+    #         new_data_util.append(numpy_list)
+    #
+    #     return new_data_chess, new_data_util
 
-        return new_data_chess, new_data_util
+    # @staticmethod
+    # def utility_list(utility_list): # 29s
+    #     lables = get_lables(utility_list)
+    #     arr_all = []
+    #     for item in lables:
+    #         arr_temp = []
+    #         for row in utility_list:
+    #             result = set(row["item"]) & set(item)
+    #             if result:
+    #                 arr_temp.append(row)
+    #         arr = [item, arr_temp]
+    #         arr_all.append(arr)
+    #     print(arr_all)
+    #     return arr_all
 
-    @staticmethod
-    def utility_list(utility_list):
-        lables = get_lables(utility_list)
-        arr_all = []
-        for item in lables:
-            arr_temp = []
-            for row in utility_list:
-                result = set(row["item"]) & set(item)
-                if result:
-                    arr_temp.append(row)
-            arr = [item, arr_temp]
-            arr_all.append(arr)
-        return arr_all
+
 
     @staticmethod
     def construct(up, upx, upy):
@@ -122,6 +159,7 @@ class HUIMiner:
                                     "Ru": ey["Ru"],
                                     "u": (ex["u"] + ey["u"] - row["u"])
                                 }
+                                break
                     else:
                         items_dic = {
                             "tid": ex["tid"],
@@ -133,31 +171,36 @@ class HUIMiner:
                     arr.append(items_dic)
                     pxy.append(unique_l)
                     pxy.append(arr)
+                    break
         return pxy
 
-    def hui_miner(self, pUL, uls):
+    def hui_miner(self, pUL, uls, hui_result):
         """
             pUL: the utility-list of item-set P, initially empty;
             uls: the set of utility-lists
         """
-        for i in range(0, len(uls)):
+        for index, X in enumerate(uls):
             countU = 0
             countRu = 0
-            X = uls[i]
-            if uls[i]:
+            if X:
                 for item in X[1]:
                     countU += item["u"]
                     countRu += item["Ru"]
                 if countU >= self.min_util:
-                    print(X, "\n")
-                # if (countU + countRu) >= self.min_util:
-                exUls = []
-                for j in range(i + 1, len(uls)):
-                    result = self.construct(pUL, X, uls[j])
-                    if result:
-                        exUls.append(result)
-            self.hui_miner(X, exUls)
+                    hui_result.append(X)
+                if (countU + countRu) >= self.min_util:
+                    exUls = []
+                    for j in range(index + 1, len(uls)):
+                        result = self.construct(pUL, X, uls[j])
+                        if result:
+                            exUls.append(result)
+                    self.hui_miner(X, exUls, hui_result)
 
     def run(self):
-        self.hui_miner([], self.utility_list_result)
+        hui_result = []
+        start = time.time()
+        self.hui_miner([], self.utility_list_result, hui_result)
+        print('Tổng thời gian khai thác HUI: %s giây' % (time.time() - start))
+        return hui_result
+
 

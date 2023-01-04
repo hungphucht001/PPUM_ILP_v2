@@ -10,7 +10,7 @@ from HUI import HUIMiner
 
 
 class PPUM_ILP:
-    def __init__(self, data_chess, HUI, M):
+    def __init__(self, data_chess, HUI, min_utility, external_utility):
         """
             HUI: HUIMiner
             M: min_util
@@ -18,12 +18,13 @@ class PPUM_ILP:
             NHI_TB:
             SHI_TB:
         """
-        self.M = M
+        self.min_utility = min_utility
         self.D_ = []
         self.Is = [[1, 2]]
         # self.Is = [[1, 2], [1, 3], [1, 4]]
         self.HUI = HUI
         self.data_chess = data_chess
+        self.external_utility = external_utility
 
         # self.D = D
         # self.data = data
@@ -34,11 +35,6 @@ class PPUM_ILP:
     def filter_NHI_and_SHI_to_HUI(self):
         """
             HUI -> SHI_TB and NHI_TB
-            SHI_TB = (Is + tid)
-            NHI_TB:
-                +
-                +
-                +
         """
         NHI_TB = []
         SHI_TB = []
@@ -47,7 +43,6 @@ class PPUM_ILP:
             isIs = False
             for item_Is in self.Is:
                 if compare_array(lable, item_Is):
-
                     SHI_TB.append(item)
                     isIs = True
             if not isIs:
@@ -65,6 +60,73 @@ class PPUM_ILP:
             result.append(item["tid"])
         return result
 
+    def arr_sum(self, item):
+        """
+
+        """
+        arr_sum = {}
+        for X in item:
+            dict_aa = {}
+            dict_aa[X] = LpAffineExpression()
+            arr_sum.update(dict_aa)
+        return arr_sum
+
+    def index_TIDs(self, i):
+        for item in self.HUI:
+            if item[0] == i:
+                arr = []
+                for row in item[1]:
+                    arr.append(row['tid'])
+                return arr
+                break
+
+    def arr_Si(self, arr, temp, deci_variables):
+        """
+            {'A': 1*A1 + 1*A5 + 1*A7 + 0, 'B': 1*B1 + 1*B5 + 1*B7 + 0}
+            {'A': 1*A2 + 1*A8 + 1*A9 + 0, 'C': 1*C2 + 1*C8 + 1*C9 + 0}
+            {'A': 1*A1 + 1*A5 + 1*A8 + 0, 'D': 1*D1 + 1*D5 + 1*D8 + 0}
+        """
+        for item_vb in deci_variables:
+            for item in arr:
+                if (item == item_vb):
+                    for i in self.Is:
+                        if temp == i:
+                            for j in self.index_TIDs(i):
+                                arr[item] += deci_variables[item][j + 1]
+        return arr
+
+    def check_nhi_in_shi(self, item):
+        """
+            kiểm tra Nhi có trong Shi hay không
+        """
+        strItem = []
+        for a in self.Is:
+            for i in a:
+                for j in item:
+                    if j not in strItem and (i == j):
+                        strItem.append(j)
+        return strItem
+
+    def right_side(self, item, arr):
+        """
+            Tính vế phải
+        """
+        sum_ = 0
+        temp = self.check_nhi_in_shi(item)
+        for x in arr:
+            if item in self.HUI_TIDs and self.HUI_TIDs[item][x - 1] != 0:
+                sum_ += self.HUI_TIDs[temp][x - 1]
+        return (self.HUI[item] - sum_)
+
+    def arr_X(self, TIDs, item):
+        arr = []
+        for X in self.Is:
+            for i in self.index_TIDs(X):
+                for j in range(len(TIDs[item])):
+                    if i == j and TIDs[item][j] != 0:
+                        arr.append(i + 1)
+        return arr
+
     def algorithm(self):
         """
             The PPUM-ILP algorithm
@@ -72,12 +134,11 @@ class PPUM_ILP:
         # Table constructions:
         NHI_TB, SHI_TB = self.filter_NHI_and_SHI_to_HUI()
 
-        # # Preprocessing:
-        index = 0
+        # Preprocessing:
         NHI_TB_Temp = NHI_TB.copy()
         NHI_TB = []
         for ni in NHI_TB_Temp:
-            L = []  # Khởi tạo L rỗng
+
             a = np.array(ni[0])
             c = np.array(self.get_tid(ni[1]))
 
@@ -111,33 +172,60 @@ class PPUM_ILP:
 
         print("/////////////////////////////")
         print("NHI_TB: ")
-
         for a in NHI_TB:
             print(a[0])
 
-        #  CSP formulation:
-        #  Biến quyết định x, y, z
-
+        """
+            CSP formulation:
+            Biến quyết định x, y, z
+        """
         deci_variables = {}
-        for item in self.Is:
-            for X in item:
-                dict_aa = {}
-                dict_aa[X] = {i: LpVariable(name=f"{X}_{i}", lowBound=1) for i in range(1, len(self.data_chess) + 1)}
-                deci_variables.update(dict_aa)
+        for item_is in self.Is:
+            for X in item_is:
+                temp = {X: {i: LpVariable(name=f"{X}_{i}", lowBound=1) for i in range(1, len(self.data_chess) + 1)}}
+                deci_variables.update(temp)
 
-        # Khởi tạo model
+        """
+            Khởi tạo model:
+            model : Lable : 5 * A1 + 5 * A5 + 5 * A7 + 3 * B1 <= min_utility
+        """
         model = LpProblem(name="resource-allocation-ILP", sense=LpMinimize)
 
-        # model SHI_TB
+        """
+            model SHI_TB:
+            AB ∶ 5(u11 + u51 + u71) + 3(u12 + u52 + u72) < 80
+        """
         sum_AB = 0
+        for item_is in self.Is:
+            sum = 0
+            result = self.arr_Si(self.arr_sum(item_is), item_is, deci_variables)
+            for item_lable in result:
+                sum += external_utility[item_lable] * result[item_lable]
+                sum_AB += result[item_lable]
+            model += (sum <= self.min_utility - 1, item_is)
+        print("model", model)
 
-        # for item in self.Is:
-        #     sum = 0
-            # arr = self.arr_Si(self.arr_sum(item), item, deci_variables)
-        #     for i in arr:
-        #         sum += utility_Dic[i] * arr[i]
-        #         sum_AB += arr[i]
-        #     model += ((sum) <= self.M - 1, item)
+        """
+            model NHI_TB:
+            A ∶ 5(u11 + u51 + u71) ≥ 80 − 70,
+            AD ∶ 5(u11 + u51) ≥ 80 − 75,
+            BD ∶ 3(u12 + u52) ≥ 80 − 42,
+            ABDE ∶ 5u11 + 3u12 ≥ 80 − 34
+        """
+        for item in NHI_TB:
+            X = self.check_nhi_in_shi(item[0])
+            sum_item = 0
+            # arr = self.arr_X(NHI_TB, item)
+            # arr = list(set(arr))
+            # for i in X:
+            #     util_ = external_utility[i]
+            #     sum_item_2 = 0
+            #     for j in arr:
+            #         for k in deci_variables:
+            #             if (k == i):
+            #                 sum_item_2 += deci_variables[k][j]
+            #     sum_item += util_ * sum_item_2
+            # model += ((sum_item) >= self.M - self.VP(item, arr), item)
 
         # Solve the optimization problem
         # model.solve()
@@ -145,7 +233,12 @@ class PPUM_ILP:
     def run(self):
         self.algorithm()
 
+
 def TWU_item(item, dataset, tran_util, data_util):
+    """
+        Calc item TWU
+        Calc item external utility
+    """
     TWU = 0
     array_util = []
     for i in range(len(dataset)):
@@ -160,10 +253,11 @@ def TWU_item(item, dataset, tran_util, data_util):
     gcd = np.gcd.reduce(array_util)  # Ước chung lớn nhất
     return TWU, gcd
 
+
 if __name__ == "__main__":
     start = time.time()
     print("Đọc data từ file txt.")
-    data_chess, sum_util, data_util, item_list = load_dataset_util('chess_quan.txt')
+    data_chess, sum_util, data_util, item_list = load_dataset_util('test.txt')
 
     # print('Dataset: ')
     # print(data_chess)
@@ -176,7 +270,7 @@ if __name__ == "__main__":
 
     delta = 0.25
     min_utility = sum(sum_util) * delta
-    # min_utility = 80
+    min_utility = 80
     print('====================')
     print('TWU từng item (>= minutil)')
     twu_name = []
@@ -191,13 +285,15 @@ if __name__ == "__main__":
             twu_name.append(int(item))
             twu_value.append(twu)
 
-    len_data = len(data_chess)
+    print("External Utility:")
+    print(external_utility)
 
+    len_data = len(data_chess)
     data_chess_copy = []
     data_util_copy = []
 
     """
-        Loại bỏ từng item có TWU < min-utility)
+        Loại bỏ từng item có TWU < min-utility)
     """
     for i in range(len(data_chess)):
         arr_data = []
@@ -216,6 +312,6 @@ if __name__ == "__main__":
     hui = hui_miner.run()
     print("Khai thác xong.")
 
-    print("Sử dụng ILP:")
-    PPUM_ILP(data_chess_copy, hui, min_utility).run()
+    print("PPUM_ILP:")
+    PPUM_ILP(data_chess_copy, hui, min_utility, external_utility).run()
     print('Tổng thời gian: %s giây' % (time.time() - start))

@@ -1,5 +1,5 @@
 import time
-
+import numpy as np
 
 def compare_array(array_one, array_two):
     """
@@ -137,15 +137,19 @@ class HUIMiner:
     #     print(arr_all)
     #     return arr_all
 
+    def search_ey(self, array, tid):
+        for ey in array:
+            if ey["tid"] == tid:
+                return ey
+        return None
 
 
-    @staticmethod
-    def construct(up, upx, upy):
+    def construct(self, up, upx, upy):
         pxy = []
         arr = []
         for ex in upx[1]:
             for ey in upy[1]:
-                if ex["tid"] == ey["tid"]:
+                if ey["tid"] == ex["tid"]:
                     items_dic = {}
                     arrLable = list(ex['item']) + list(ey['item'])
                     s = set(arrLable)
@@ -179,22 +183,22 @@ class HUIMiner:
             pUL: the utility-list of item-set P, initially empty;
             uls: the set of utility-lists
         """
+        print(uls)
         for index, X in enumerate(uls):
             countU = 0
             countRu = 0
-            if X:
-                for item in X[1]:
-                    countU += item["u"]
-                    countRu += item["Ru"]
-                if countU >= self.min_util:
-                    hui_result.append(X)
-                if (countU + countRu) >= self.min_util:
-                    exUls = []
-                    for j in range(index + 1, len(uls)):
-                        result = self.construct(pUL, X, uls[j])
-                        if result:
-                            exUls.append(result)
-                    self.hui_miner(X, exUls, hui_result)
+            for item in X[1]:
+                countU += item["u"]
+                countRu += item["Ru"]
+            if countU >= self.min_util:
+                hui_result.append(X)
+            if (countU + countRu) >= self.min_util:
+                exUls = []
+                for j in range(index + 1, len(uls)):
+                    result = self.construct(pUL, X, uls[j])
+                    if result:
+                        exUls.append(result)
+                self.hui_miner(X, exUls, hui_result)
 
     def run(self):
         hui_result = []
